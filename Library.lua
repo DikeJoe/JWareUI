@@ -168,32 +168,17 @@ local function InitJWareUI()
 		local Window       = { CurrentTab=nil, Tabs={}, KeybindLabels={} }
 
 		-- ═════════════════════════════════════════════════════════════════════
-		-- Config / Save System
+		-- Auto-Save System
 		-- ═════════════════════════════════════════════════════════════════════
 		local CONFIG_FOLDER = "JWareUI_Configs"
-		local CONFIG_EXT    = ".json"
+		local CONFIG_FILE   = "autosave.json"
+		local CONFIG_PATH   = CONFIG_FOLDER .. "/" .. CONFIG_FILE
 
 		local saveableElements = {}
+		local saveDebounce = {}
 
 		local function ensureFolder()
 			if not isfolder(CONFIG_FOLDER) then makefolder(CONFIG_FOLDER) end
-		end
-
-		local function configPath(name)
-			return CONFIG_FOLDER .. "/" .. name .. CONFIG_EXT
-		end
-
-		local function listConfigs()
-			ensureFolder()
-			local files = listfiles(CONFIG_FOLDER)
-			local names = {}
-			for _, path in ipairs(files) do
-				local name = path:match("[/\\]?([^/\\]+)$") or path
-				if name ~= "_autoload.txt" and name:sub(-#CONFIG_EXT) == CONFIG_EXT then
-					table.insert(names, name:sub(1, -#CONFIG_EXT-1))
-				end
-			end
-			return names
 		end
 
 		local function serialise(v)
@@ -218,35 +203,47 @@ local function InitJWareUI()
 			return v
 		end
 
-		function Window:SaveConfig(name)
+		local function saveAllSettings()
 			ensureFolder()
 			local data = {}
 			for _, entry in ipairs(saveableElements) do
 				local ok, val = pcall(entry.getVal)
-				if ok then data[entry.key] = serialise(val) end
+				if ok then
+					data[entry.key] = serialise(val)
+				end
 			end
 			local ok, encoded = pcall(game:GetService("HttpService").JSONEncode, game:GetService("HttpService"), data)
-			if ok then writefile(configPath(name), encoded) end
+			if ok then
+				writefile(CONFIG_PATH, encoded)
+			end
 		end
 
-		function Window:LoadConfig(name)
-			local path = configPath(name)
-			if not isfile(path) then return false end
+		local function loadAllSettings()
+			if not isfile(CONFIG_PATH) then return end
 			local ok, decoded = pcall(function()
-				return game:GetService("HttpService"):JSONDecode(readfile(path))
+				return game:GetService("HttpService"):JSONDecode(readfile(CONFIG_PATH))
 			end)
-			if not ok or type(decoded) ~= "table" then return false end
+			if not ok or type(decoded) ~= "table" then return end
 			for _, entry in ipairs(saveableElements) do
 				local raw = decoded[entry.key]
 				if raw ~= nil then
 					pcall(entry.setVal, deserialise(raw))
 				end
 			end
-			return true
 		end
 
 		local function registerSaveable(key, getVal, setVal)
 			table.insert(saveableElements, { key=key, getVal=getVal, setVal=setVal })
+		end
+
+		local function enqueueSave(delay)
+			delay = delay or 0.5
+			if saveDebounce[delay] then return end
+			saveDebounce[delay] = true
+			task.delay(delay, function()
+				saveDebounce[delay] = nil
+				saveAllSettings()
+			end)
 		end
 
 		-- ── ScreenGuis ────────────────────────────────────────────────────────
@@ -559,6 +556,7 @@ local function InitJWareUI()
 
 					local function doToggle()
 						toggled=not toggled; syncCheck(true); cfg.Callback(toggled)
+						if cfg.Save then enqueueSave() end
 						if cfg.Sync then keyState=toggled; setKeyColor(toggled); cfg.KeyCallback("Sync",{Key=currentKey,Mode=cfg.Mode,State=toggled}) end
 					end
 
@@ -745,10 +743,12 @@ local function InitJWareUI()
 									end
 									DropTitle.Text = (#selected > 0) and table.concat(selected, ", ") or cfg.Placeholder
 									cfg.Callback(selected)
+									if cfg.Save then enqueueSave() end
 								else
 									selected      = optName
 									DropTitle.Text = optName
 									cfg.Callback(optName)
+									if cfg.Save then enqueueSave() end
 									tween(optLbl, { BackgroundColor3 = Theme.MainColor }, function()
 										tween(optLbl, { BackgroundColor3 = C_ELEM_BG })
 									end)
@@ -850,6 +850,7 @@ local function InitJWareUI()
 						Fill:TweenSize(UDim2.new(pct,0,1,0),Enum.EasingDirection.InOut,Enum.EasingStyle.Quad,0.03,true)
 						ValueLbl.Text=tostring(math.floor(currentValue))..cfg.Suffix
 						cfg.Callback(currentValue)
+						if cfg.Save then enqueueSave() end
 					end
 
 					local initPct=(cfg.Max~=cfg.Min) and ((cfg.Default-cfg.Min)/(cfg.Max-cfg.Min)) or 0
@@ -950,6 +951,7 @@ local function InitJWareUI()
 						Swatch.BackgroundColor3=selColor
 						if not skipHex then HexInput.Text=colorToHex(selColor) end
 						cfg.Callback(selColor)
+						if cfg.Save then enqueueSave() end
 					end
 
 					local function initFromColor(c)
@@ -1030,7 +1032,7 @@ local function InitJWareUI()
 				-- ─────────────────────────────────────────────────────────────
 				function Section:AddKeyPicker(cfg)
 					cfg=cfg or {}
-					validate({ Title="Keybind", Default="None", Mode="Toggle", Callback=function()end }, cfg)
+					validate({ Title="Keybind", Default="None", Mode="Toggle", Callback=function()end, Save=false }, cfg)
 
 					local Holder=makeFrame({ Name="KeyPicker_"..cfg.Title, BackgroundTransparency=1, Size=UDim2.new(0,208,0,20) }, self.ElementsHolder)
 					local TitleLbl=makeLabel({ Name="Title", BackgroundTransparency=1, Size=UDim2.new(1,-40,1,0), Text=cfg.Title, TextSize=14, TextXAlignment=Enum.TextXAlignment.Left, TextColor3=C_TEXT_NORMAL, Font=Enum.Font.Gotham }, Holder)
@@ -1049,7 +1051,7 @@ local function InitJWareUI()
 							listening=true
 							startListening(KeyLbl,function(name)
 								listening=false
-								if name~=currentKey then currentKey=name; Window:AddKeybind(cfg.Title,name); cfg.Callback("Changed",{Key=name,Mode=cfg.Mode}) end
+								if name~=currentKey then currentKey=name; Window:AddKeybind(cfg.Title,name); if cfg.Save then enqueueSave() end; cfg.Callback("Changed",{Key=name,Mode=cfg.Mode}) end
 							end)
 							return
 						end
@@ -1072,12 +1074,16 @@ local function InitJWareUI()
 						end
 					end)
 
-					return {
+					local kpApi = {
 						GetKey =function() return currentKey end,
-						SetKey =function(v) if v~=currentKey then currentKey=v; KeyLbl.Text=v; Window:AddKeybind(cfg.Title,v); cfg.Callback("Changed",{Key=v,Mode=cfg.Mode}) end end,
+						SetKey =function(v) if v~=currentKey then currentKey=v; KeyLbl.Text=v; Window:AddKeybind(cfg.Title,v); if cfg.Save then enqueueSave() end; cfg.Callback("Changed",{Key=v,Mode=cfg.Mode}) end end,
 						GetMode=function() return cfg.Mode end,
 						SetMode=function(v) cfg.Mode=v end,
 					}
+					if cfg.Save then
+						registerSaveable("keypicker_"..cfg.Title, function() return currentKey end, function(v) kpApi.SetKey(v) end)
+					end
+					return kpApi
 				end
 
 				-- ─────────────────────────────────────────────────────────────
@@ -1149,6 +1155,7 @@ local function InitJWareUI()
 						tween(BoxFrame, { BackgroundColor3=C_ELEM_BG })
 						tween(TitleLbl, { TextColor3=C_TEXT_NORMAL })
 						cfg.OnUnfocus(currentValue, enterPressed)
+						if cfg.Save then enqueueSave() end
 						cfg.Callback(currentValue, enterPressed)
 					end)
 
@@ -1177,6 +1184,7 @@ local function InitJWareUI()
 							if cfg.MaxLength and #v > cfg.MaxLength then v=v:sub(1,cfg.MaxLength) end
 							currentValue   = v
 							TextBox.Text   = v
+							if cfg.Save then enqueueSave() end
 							cfg.Callback(currentValue, false)
 						end,
 						Clear    = function()
@@ -1195,340 +1203,10 @@ local function InitJWareUI()
 			return Tab
 		end -- AddTab
 
-		-- ═══════════════════════════════════════════════════════════════════════════
-		-- DROP-IN REPLACEMENT  –  paste this over the existing Window:AddConfigSection
-		-- inside InitJWareUI(), right before  "return Window"
-		-- ═══════════════════════════════════════════════════════════════════════════
-		function Window:AddConfigSection(section)
-
-			-- ── constants ─────────────────────────────────────────────────────────
-			local META_FILE   = CONFIG_FOLDER .. "/_autoload.txt"
-			local ITEM_H      = 20        -- height of each config row in the list
-			local MAX_VISIBLE = 5         -- rows visible before scrolling
-			local LIST_W      = 208
-
-			-- ── state ─────────────────────────────────────────────────────────────
-			local selectedName  = nil     -- currently selected config name (string | nil)
-			local listExpanded  = false
-			local nameInputApi  = nil     -- set after we create the TextInput element
-
-			-- ── helpers ───────────────────────────────────────────────────────────
-			local function ensureCfgFolder()
-				if not isfolder(CONFIG_FOLDER) then makefolder(CONFIG_FOLDER) end
-			end
-
-			local function cfgPath(name)
-				return CONFIG_FOLDER .. "/" .. name .. CONFIG_EXT
-			end
-
-			local function listCfgNames()
-				ensureCfgFolder()
-				local out = {}
-				for _, path in ipairs(listfiles(CONFIG_FOLDER)) do
-					local n = path:match("[/\\]?([^/\\]+)$") or path
-					if n ~= "_autoload.txt" and n:sub(-#CONFIG_EXT) == CONFIG_EXT then
-						table.insert(out, n:sub(1, -#CONFIG_EXT - 1))
-					end
-				end
-				table.sort(out)
-				return out
-			end
-
-			-- ── Build the dropdown row frame ──────────────────────────────────────
-			-- We build it manually so we fully control open/close without touching
-			-- the shared activePopup / PopupOverlay system that AddDropdown uses.
-
-			local DropOuter = makeFrame({
-				Name                = "CfgDropOuter",
-				BackgroundTransparency = 1,
-				Size                = UDim2.new(0, LIST_W, 0, ITEM_H),
-			}, section.ElementsHolder)
-
-			local DropBtn = makeFrame({
-				Name             = "CfgDropBtn",
-				BackgroundColor3 = C_ELEM_BG,
-				Size             = UDim2.new(0, LIST_W, 0, ITEM_H),
-				ZIndex           = 10,
-			}, DropOuter)
-			addOutlineStroke(DropBtn)
-
-			local DropLabel = makeLabel({
-				Name               = "Label",
-				BackgroundTransparency = 1,
-				Size               = UDim2.new(0, LIST_W - 20, 1, 0),
-				Position           = UDim2.new(0, 5, 0, 0),
-				TextSize           = 14,
-				TextXAlignment     = Enum.TextXAlignment.Left,
-				TextColor3         = C_TEXT_DIM,
-				Font               = Enum.Font.Gotham,
-				Text               = "Saved configs",
-				ZIndex             = 11,
-			}, DropBtn)
-
-			local DropArrow = makeLabel({
-				Name               = "Arrow",
-				BackgroundTransparency = 1,
-				Size               = UDim2.new(0, 15, 1, 0),
-				Position           = UDim2.new(1, -20, 0, -2),
-				TextSize           = 14,
-				TextXAlignment     = Enum.TextXAlignment.Right,
-				TextColor3         = C_TEXT_NORMAL,
-				Font               = Enum.Font.Gotham,
-				Text               = "▼",
-				ZIndex             = 11,
-			}, DropBtn)
-
-			-- ── The inline list (NOT in PopupOverlay – lives inside ElementsHolder) ─
-			-- It sits immediately below DropOuter and is toggled visible/invisible.
-			-- Because it is inside the section's own column it never conflicts with
-			-- the shared activePopup logic.
-
-			local listNames     = {}   -- current names shown
-			local listRowFrames = {}   -- {frame, label} per row
-
-			local ListOuter = makeFrame({
-				Name = "CfgList",
-				BackgroundColor3 = C_ELEM_BG,
-				Size = UDim2.new(0, LIST_W, 0, 0),
-				Visible = false,
-				ClipsDescendants = true,
-				ZIndex = 1000,
-			}, PopupOverlay) -- or ScreenGui/MainGui
-
-			ListOuter.AnchorPoint = Vector2.new(0, 0)
-			ListOuter.Position = UDim2.new(0, 0, 0, 100)
-
-			addOutlineStroke(ListOuter)
-
-			local ListScroll = makeInstance("ScrollingFrame", {
-				Name                  = "Scroll",
-				BackgroundTransparency= 1,
-				BorderSizePixel        = 0,
-				Size                  = UDim2.new(1, 0, 1, 0),
-				CanvasSize             = UDim2.new(0, 0, 0, 0),
-				ScrollBarThickness     = 4,
-				ScrollBarImageColor3   = Theme.MainColor,
-				ZIndex                 = 12,
-			}, ListOuter)
-			track(T.scrolls, ListScroll)
-			makeInstance("UIListLayout", {
-				SortOrder    = Enum.SortOrder.LayoutOrder,
-				Padding      = UDim.new(0, 0),
-			}, ListScroll)
-
-			-- ── rebuild list rows ─────────────────────────────────────────────────
-			local function rebuildRows(names)
-				listNames = names
-				-- destroy old rows
-				for _, child in ipairs(ListScroll:GetChildren()) do
-					if not child:IsA("UIListLayout") then child:Destroy() end
-				end
-				listRowFrames = {}
-
-				local totalH = #names * ITEM_H
-				local visH   = math.min(#names, MAX_VISIBLE) * ITEM_H
-				ListOuter.Size               = UDim2.new(0, LIST_W, 0, visH)
-				ListScroll.CanvasSize        = UDim2.new(0, 0, 0, totalH)
-				ListScroll.ScrollBarThickness = (totalH > visH) and 4 or 0
-
-				for _, name in ipairs(names) do
-					local row = makeInstance("TextButton", {
-						Name               = name,
-						BackgroundTransparency = 1,
-						AutoButtonColor    = false,
-						Size               = UDim2.new(1, 0, 0, ITEM_H),
-						Text               = "",
-						ZIndex             = 13,
-					}, ListScroll)
-
-					local rowLbl = makeLabel({
-						Name               = "Lbl",
-						BackgroundColor3   = C_ELEM_BG,
-						BackgroundTransparency = 0,
-						Size               = UDim2.new(1, 0, 1, 0),
-						Text               = name,
-						TextSize           = 14,
-						TextXAlignment     = Enum.TextXAlignment.Left,
-						TextColor3         = C_TEXT_NORMAL,
-						Font               = Enum.Font.Gotham,
-						ZIndex             = 13,
-					}, row)
-					addOutlineStroke(rowLbl)
-					makeInstance("UIPadding", { PaddingLeft = UDim.new(0, 5) }, rowLbl)
-
-					-- highlight if selected
-					if name == selectedName then
-						rowLbl.BackgroundColor3 = Theme.MainColor
-						if not table.find(T.activeOptLabels, rowLbl) then
-							table.insert(T.activeOptLabels, rowLbl)
-						end
-					end
-
-					row.MouseEnter:Connect(function() tween(rowLbl, { TextColor3 = C_TEXT_HOVER }) end)
-					row.MouseLeave:Connect(function() tween(rowLbl, { TextColor3 = C_TEXT_NORMAL }) end)
-
-					row.MouseButton1Click:Connect(function()
-						-- deselect old highlight
-						for _, rf in ipairs(listRowFrames) do
-							local ti = table.find(T.activeOptLabels, rf.label)
-							if ti then table.remove(T.activeOptLabels, ti) end
-							tween(rf.label, { BackgroundColor3 = C_ELEM_BG })
-						end
-						-- select new
-						selectedName = name
-						tween(rowLbl, { BackgroundColor3 = Theme.MainColor })
-						if not table.find(T.activeOptLabels, rowLbl) then
-							table.insert(T.activeOptLabels, rowLbl)
-						end
-						DropLabel.Text     = name
-						DropLabel.TextColor3 = C_TEXT_NORMAL
-						-- sync name input
-						if nameInputApi then nameInputApi.SetValue(name) end
-						-- collapse
-						listExpanded          = false
-						ListOuter.Visible     = false
-						DropArrow.Text        = "▼"
-						tween(DropBtn, { BackgroundColor3 = C_ELEM_BG })
-					end)
-
-					table.insert(listRowFrames, { frame = row, label = rowLbl })
-				end
-			end
-
-			-- ── open / close helpers ──────────────────────────────────────────────
-			local function openList()
-				local names = listCfgNames()
-				if #names == 0 then return end
-
-				rebuildRows(names)
-
-				local absPos = DropBtn.AbsolutePosition
-				local absSize = DropBtn.AbsoluteSize
-				local overlayPos = PopupOverlay.AbsolutePosition
-
-				ListOuter.Position = UDim2.fromOffset(
-					absPos.X - overlayPos.X,
-					absPos.Y - overlayPos.Y + absSize.Y + 2
-				)
-
-				listExpanded = true
-				ListOuter.Visible = true
-				DropArrow.Text = "▲"
-
-				tween(DropBtn, {
-					BackgroundColor3 = Theme.MainColor
-				})
-			end
-
-			local function closeList()
-				listExpanded      = false
-				ListOuter.Visible = false
-				DropArrow.Text    = "▼"
-				tween(DropBtn, { BackgroundColor3 = C_ELEM_BG })
-			end
-
-			local function toggleList()
-				if listExpanded then closeList() else openList() end
-			end
-
-			-- hover / click on the dropdown button
-			DropBtn.MouseEnter:Connect(function()
-				tween(DropLabel, { TextColor3 = C_TEXT_HOVER })
-				tween(DropArrow, { TextColor3 = C_TEXT_HOVER })
-			end)
-			DropBtn.MouseLeave:Connect(function()
-				tween(DropLabel, { TextColor3 = selectedName and C_TEXT_NORMAL or C_TEXT_DIM })
-				tween(DropArrow, { TextColor3 = C_TEXT_NORMAL })
-			end)
-			DropBtn.InputBegan:Connect(function(i)
-				if i.UserInputType == MB1 then toggleList() end
-			end)
-
-			-- ── Config Name text input ────────────────────────────────────────────
-			nameInputApi = section:AddTextInput({
-				Title        = "Name",
-				Default      = "",
-				Placeholder  = "New config..",
-				ClearOnFocus = false,
-				Callback     = function() end,
-			})
-
-			-- ── Save ──────────────────────────────────────────────────────────────
-			section:AddButton({
-				Title    = "Save",
-				Callback = function()
-					local name = nameInputApi.GetValue():match("^%s*(.-)%s*$")  -- trim
-					if name == "" then return end
-					self:SaveConfig(name)
-					selectedName   = name
-					DropLabel.Text      = name
-					DropLabel.TextColor3 = C_TEXT_NORMAL
-					if listExpanded then closeList() end
-					-- persist autoload file if it already points somewhere
-					ensureCfgFolder()
-					if isfile(META_FILE) then writefile(META_FILE, name) end
-				end,
-			})
-
-			-- ── Load ──────────────────────────────────────────────────────────────
-			section:AddButton({
-				Title    = "Load",
-				Callback = function()
-					if not selectedName or selectedName == "" then return end
-					self:LoadConfig(selectedName)
-					nameInputApi.SetValue(selectedName)
-				end,
-			})
-
-			-- ── Delete ────────────────────────────────────────────────────────────
-			section:AddButton({
-				Title    = "Delete",
-				Callback = function()
-					if not selectedName or selectedName == "" then return end
-					local path = cfgPath(selectedName)
-					if isfile(path) then delfile(path) end
-					if isfile(META_FILE) and readfile(META_FILE) == selectedName then
-						delfile(META_FILE)
-					end
-					selectedName = nil
-					DropLabel.Text      = "Select config..."
-					DropLabel.TextColor3 = C_TEXT_DIM
-					nameInputApi.SetValue("")
-					-- close list cleanly (no Refresh, no popup system touched)
-					closeList()
-				end,
-			})
-
-			-- ── Load on Start toggle ──────────────────────────────────────────────
-			local autoName   = isfile(META_FILE) and readfile(META_FILE) or ""
-			local autoActive = autoName ~= ""
-
-			if autoActive then
-				selectedName         = autoName
-				DropLabel.Text       = autoName
-				DropLabel.TextColor3 = C_TEXT_NORMAL
-			end
-
-			section:AddToggle({
-				Title    = "Load on Start",
-				Default  = autoActive,
-				Callback = function(state)
-					ensureCfgFolder()
-					if state then
-						local name = nameInputApi.GetValue():match("^%s*(.-)%s*$")
-						if name == "" then name = selectedName end
-						if name and name ~= "" then writefile(META_FILE, name) end
-					else
-						if isfile(META_FILE) then delfile(META_FILE) end
-					end
-				end,
-			})
-
-			-- ── Auto-load on script start ─────────────────────────────────────────
-			if autoActive and autoName ~= "" then
-				task.defer(function() self:LoadConfig(autoName) end)
-			end
-		end
+		-- Auto-load settings on window creation
+		task.delay(0.5, function()
+			loadAllSettings()
+		end)
 
 		return Window
 	end -- CreateWindow
