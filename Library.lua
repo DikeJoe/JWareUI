@@ -1,7 +1,7 @@
 -- ─── Themes ───────────────────────────────────────────────────────────────────
 Themes = {
-	JWare  = { MainColor = Color3.fromRGB(70,7,100),   OutlineColor = Color3.fromRGB(0,0,0), BackgroundColor = Color3.fromRGB(27,27,27), BackgroundColor2 = Color3.fromRGB(16,16,16) },
-	JWare2 = { MainColor = Color3.fromRGB(135,0,2),    OutlineColor = Color3.fromRGB(0,0,0), BackgroundColor = Color3.fromRGB(27,27,27), BackgroundColor2 = Color3.fromRGB(16,16,16) },
+	JWare  = { MainColor = Color3.fromRGB(70,7,100),   OutlineColor = Color3.fromRGB(0,0,0), AccentColor = Color3.fromRGB(27,27,27), BackgroundColor = Color3.fromRGB(16,16,16) },
+	JWare2 = { MainColor = Color3.fromRGB(135,0,2),    OutlineColor = Color3.fromRGB(0,0,0), AccentColor = Color3.fromRGB(27,27,27), BackgroundColor = Color3.fromRGB(16,16,16) },
 }
 
 local function InitJWareUI()
@@ -280,8 +280,8 @@ local function InitJWareUI()
 			for _,g in ipairs(T.gradients)        do if g and g.Parent then g.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,nt.MainColor),ColorSequenceKeypoint.new(1,nt.BackgroundColor2)} end end
 			for _,f in ipairs(T.fills)            do if f and f.Parent then f.BackgroundColor3=nt.MainColor end end
 			for _,sf in ipairs(T.scrolls)         do if sf and sf.Parent then sf.ScrollBarImageColor3=nt.MainColor end end
-			for _,fr in ipairs(T.mainFrames)      do if fr and fr.Parent then fr.BackgroundColor3=nt.BackgroundColor end end
-			for _,fr in ipairs(T.bg2Frames)       do if fr and fr.Parent then fr.BackgroundColor3=nt.BackgroundColor2 end end
+			for _,fr in ipairs(T.mainFrames)      do if fr and fr.Parent then fr.BackgroundColor3=nt.AccentColor end end
+			for _,fr in ipairs(T.bg2Frames)       do if fr and fr.Parent then fr.BackgroundColor3=nt.BackgroundColor end end
 			for _,btn in ipairs(T.tabButtons)     do if btn and btn.Parent and btn.BackgroundTransparency==0 then btn.BackgroundColor3=nt.MainColor end end
 			for _,c in ipairs(T.activeChecks)     do if c and c.Parent then c.BackgroundColor3=nt.MainColor end end
 			for _,l in ipairs(T.activeOptLabels)  do if l and l.Parent then l.BackgroundColor3=nt.MainColor end end
@@ -300,13 +300,13 @@ local function InitJWareUI()
 
 		-- ── Main Frame ────────────────────────────────────────────────────────
 		local MainFrame = mainFrame({
-			Name="MainFrame", BackgroundColor3=Theme.BackgroundColor,
+			Name="MainFrame", BackgroundColor3=Theme.AccentColor,
 			Size=UDim2.new(0,WIN_W,0,WIN_H),
 			Position=UDim2.fromOffset(math.floor(VIEWPORT.X/2-WIN_W/2), math.floor(VIEWPORT.Y/2-WIN_H/2)),
 		}, mainGui)
 		addTrackedStroke(MainFrame, Theme.MainColor, 2)
 
-		local TitleBar = mainFrame({ Name="TitleBar", BackgroundColor3=Theme.BackgroundColor, Size=UDim2.new(0,WIN_W,0,30) }, MainFrame)
+		local TitleBar = mainFrame({ Name="TitleBar", BackgroundColor3=Theme.AccentColor, Size=UDim2.new(0,WIN_W,0,30) }, MainFrame)
 
 		local TitleLabel = makeLabel({
 			Name="Title", Size=UDim2.new(0,WIN_W-20,1,0), Position=UDim2.new(0,10,0,0),
@@ -316,12 +316,12 @@ local function InitJWareUI()
 		}, TitleBar)
 
 		local ContentFrame = bg2Frame({
-			Name="ContentFrame", BackgroundColor3=Theme.BackgroundColor2,
+			Name="ContentFrame", BackgroundColor3=Theme.BackgroundColor,
 			Size=UDim2.new(0,WIN_W-10,0,WIN_H-35), Position=UDim2.new(0,5,0,30),
 		}, MainFrame)
 		addOutlineStroke(ContentFrame,2)
 
-		local TabsBar = bg2Frame({ Name="TabsBar", BackgroundColor3=Theme.BackgroundColor2, Size=UDim2.new(1,0,0,40) }, ContentFrame)
+		local TabsBar = bg2Frame({ Name="TabsBar", BackgroundColor3=Theme.BackgroundColor, Size=UDim2.new(1,0,0,40) }, ContentFrame)
 		addOutlineStroke(TabsBar,2)
 
 		local TabButtonHolder = makeFrame({ Name="TabButtonHolder", BackgroundTransparency=1, Size=UDim2.new(1,0,1,0) }, TabsBar)
@@ -330,13 +330,13 @@ local function InitJWareUI()
 
 		-- ── Keybind Overlay ───────────────────────────────────────────────────
 		local KeybindFrame = mainFrame({
-			Name="KeybindFrame", BackgroundColor3=Theme.BackgroundColor,
+			Name="KeybindFrame", BackgroundColor3=Theme.AccentColor,
 			Size=UDim2.new(0,150,0,100), Position=UDim2.new(0,5,0,600), Visible=false,
 		}, overlayGui)
 		addTrackedStroke(KeybindFrame, Theme.MainColor, 2)
 
 		local KeybindContent = bg2Frame({
-			Name="Content", BackgroundColor3=Theme.BackgroundColor2,
+			Name="Content", BackgroundColor3=Theme.BackgroundColor,
 			Size=UDim2.new(0,140,0,90), Position=UDim2.new(0,5,0,5),
 		}, KeybindFrame)
 		addOutlineStroke(KeybindContent)
@@ -369,13 +369,13 @@ local function InitJWareUI()
 
 		-- ── Watermark Overlay ─────────────────────────────────────────────────
 		local WatermarkFrame = mainFrame({
-			Name="WatermarkFrame", BackgroundColor3=Theme.BackgroundColor,
+			Name="WatermarkFrame", BackgroundColor3=Theme.AccentColor,
 			Size=UDim2.new(0,400,0,30), Position=UDim2.new(0,5,0,60), Visible=false,
 		}, overlayGui)
 		addTrackedStroke(WatermarkFrame, Theme.MainColor, 2)
 
 		local WatermarkContent = bg2Frame({
-			Name="Content", BackgroundColor3=Theme.BackgroundColor2,
+			Name="Content", BackgroundColor3=Theme.BackgroundColor,
 			Size=UDim2.new(0,390,0,20), Position=UDim2.new(0,5,0,5),
 		}, WatermarkFrame)
 		addOutlineStroke(WatermarkContent)
@@ -417,7 +417,7 @@ local function InitJWareUI()
 			}, TabButton)
 
 			local ElementsContainer=mainFrame({
-				Name=tabOpts.Title.."_Container", BackgroundColor3=Theme.BackgroundColor,
+				Name=tabOpts.Title.."_Container", BackgroundColor3=Theme.AccentColor,
 				Size=UDim2.new(1,-10,0,WIN_H-90), Position=UDim2.new(0,5,0,50), Visible=false,
 			}, ContentFrame)
 			addOutlineStroke(ElementsContainer,2)
@@ -468,14 +468,14 @@ local function InitJWareUI()
 					Tab[colKey]=col
 				end
 
-				local SectionFrame=bg2Frame({ Name=secOpts.Title, BackgroundColor3=Theme.BackgroundColor2, Size=UDim2.new(0,218,0,40) }, Tab[colKey])
+				local SectionFrame=bg2Frame({ Name=secOpts.Title, BackgroundColor3=Theme.BackgroundColor, Size=UDim2.new(0,218,0,40) }, Tab[colKey])
 				addOutlineStroke(SectionFrame,2)
 
 				local GradFade=makeFrame({ Name="Fade", BackgroundColor3=Color3.fromRGB(255,255,255), Size=UDim2.new(1,0,0,20), ZIndex=1 }, SectionFrame)
 				local GradGrad=makeInstance("UIGradient",{
 					Rotation=90,
 					Transparency=NumberSequence.new{NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(1,0.5)},
-					Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Theme.MainColor),ColorSequenceKeypoint.new(1,Theme.BackgroundColor2)},
+					Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Theme.MainColor),ColorSequenceKeypoint.new(1,Theme.BackgroundColor)},
 				}, GradFade)
 				track(T.gradients, GradGrad)
 
