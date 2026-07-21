@@ -277,7 +277,7 @@ local function InitJWareUI()
 		function Window:ApplyTheme(nt)
 			for _,s in ipairs(T.strokes)         do if s and s.Parent then s.Color=nt.MainColor end end
 			for _,s in ipairs(T.outlineStrokes)  do if s and s.Parent then s.Color=nt.OutlineColor end end
-			for _,g in ipairs(T.gradients)        do if g and g.Parent then g.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,nt.MainColor),ColorSequenceKeypoint.new(1,nt.BackgroundColor2)} end end
+			for _,g in ipairs(T.gradients)        do if g and g.Parent then g.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,nt.MainColor),ColorSequenceKeypoint.new(1,nt.BackgroundColor)} end end
 			for _,f in ipairs(T.fills)            do if f and f.Parent then f.BackgroundColor3=nt.MainColor end end
 			for _,sf in ipairs(T.scrolls)         do if sf and sf.Parent then sf.ScrollBarImageColor3=nt.MainColor end end
 			for _,fr in ipairs(T.mainFrames)      do if fr and fr.Parent then fr.BackgroundColor3=nt.AccentColor end end
